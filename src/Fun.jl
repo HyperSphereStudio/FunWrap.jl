@@ -1,4 +1,7 @@
 #Written By Johnathan Bizzano
+module FunJL
+
+include("Iterable.jl")
 
 export Fun, VFun, RFun, NFun, NVFun, NRFun, EFun, NEFun,
              @Fun, @VFun, @RFun, @NFun, @NVFun, @NRFun, @EFun, @NEFun, FunDef, @DocFun, @CFun
@@ -209,4 +212,5 @@ const NEFun = Fun{Nothing, Nothing, Nothing}
 "Void No Message Function Type Definition Generator"
 macro NEFun(expr)
     FunDef(__module__, __source__, expr, :Nothing, :Nothing, nothing)
+end
 end
