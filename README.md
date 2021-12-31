@@ -1,3 +1,5 @@
+Wrapper Library designed to wrap function objects to ensure the correct signature. Very similar to using typedef in C++.
+
 To Install:
 ```julia
 #To Use
