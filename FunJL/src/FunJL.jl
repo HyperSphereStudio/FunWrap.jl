@@ -1,4 +1,3 @@
-#Written By Johnathan Bizzano
 module FunJL
 
 include("Iterable.jl")
@@ -213,4 +212,4 @@ const NEFun = Fun{Nothing, Nothing, Nothing}
 macro NEFun(expr)
     FunDef(__module__, __source__, expr, :Nothing, :Nothing, nothing)
 end
-end
+end # module

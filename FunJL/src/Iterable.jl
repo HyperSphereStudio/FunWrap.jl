@@ -1,7 +1,9 @@
 #Written By Johnathan Bizzano
-export Iterable
+export Iterable, AbstractIterable
 
-struct Iterable{ElType}
+abstract type AbstractIterable{ElType} end
+
+struct Iterable{ElType} <: AbstractIterable{ElType}
     backend
     
     function Iterable(backend)
