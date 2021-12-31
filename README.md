@@ -3,7 +3,7 @@ Wrapper Library designed to wrap function objects to ensure the correct signatur
 To Install:
 ```julia
 #To Use
-Pkg.add("FunctionWrapper")
+Pkg.add("FunWrap")
 
 using Function Wrapper
 ```
