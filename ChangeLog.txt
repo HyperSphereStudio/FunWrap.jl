@@ -1,0 +1,9 @@
+Version 0.2.0
+    Added inlining
+    Added function call type enforcement
+    Added function string doc display
+
+
+TODO:
+    Add greater support for static function typechecking rather then runtime type checking
+
