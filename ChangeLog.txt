@@ -6,4 +6,5 @@ Version 0.2.0
 
 TODO:
     Add greater support for static function typechecking rather then runtime type checking
+    Greater support to notify user of unused generic types (will throw error)
 

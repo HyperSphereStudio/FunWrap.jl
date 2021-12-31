@@ -57,6 +57,7 @@ function FunDef(mod, line, fun, ret, args, msg)
     partialTypeDef = nothing
     partialStringDef = nothing
     partialCallDef = nothing
+    partialStringDef2 = nothing
 
     try
         #Strip Return Label
@@ -131,13 +132,13 @@ function FunDef(mod, line, fun, ret, args, msg)
         #Eval No Generic Message
         if length(generics) > 0
             #Define most of the function string expr
-            nogenstrexpr = :(Base.string(x::Type{$aliasName}) = fun_str($msg))
+            partialStringDef2 = :(Base.string(x::Type{$aliasName}) = fun_str($msg))
            
             #Replace with safer reference
-            fun_str_call = nogenstrexpr.args[2].args[2].args
+            fun_str_call = partialStringDef2.args[2].args[2].args
             fun_str_call[1] = GlobalRef(@__MODULE__, :fun_str)
 
-            Core.eval(mod, nogenstrexpr)
+            Core.eval(mod, partialStringDef2)
         end
 
 
@@ -165,9 +166,10 @@ function FunDef(mod, line, fun, ret, args, msg)
         return aliasResult
     catch e
         println("Error in Function Generating $fun in $mod")
-        println(partialTypeDef)
-        println(partialCallDef)
-        println(partialStringDef)
+        println("PartialTypeDef:$partialTypeDef")
+        println("PartialCallDef:$partialCallDef")
+        println("PartialStringDef2:$partialStringDef")
+        println("PartialStringDef:$partialStringDef")
         throw(e)
     end
 end
