@@ -1,4 +1,4 @@
-name = "FunctionWrapper"
+name = "FunWrap"
 uuid = "af455024-efd4-48e8-b4ac-752b8c56ff1f"
 authors = ["Johnathan Bizzano"]
 version = "0.1.0"
