@@ -3,9 +3,9 @@ module FunWrap
 include("Iterable.jl")
 
 export Fun, VFun, RFun, NFun, NVFun, NRFun, EFun, NEFun,
-             @Fun, @VFun, @RFun, @NFun, @NVFun, @NRFun, @EFun, @NEFun, FunDef, @DocFun, @CFun
+             @Fun, @VFun, @RFun, @NFun, @NVFun, @NRFun, @EFun, @NEFun, FunDef, @CFun
 
-"Hashed Function (Args & Return)"
+
 struct Fun{R, A, H}
     _function::Function
 
@@ -20,25 +20,23 @@ struct Fun{R, A, H}
         a = methods(_function)[1].sig.parameters[2:end]
         if length(a) > 1
             a = Tuple{a...,}
-        else
-            a = a[1]
         end
         Fun(r, a, _function, Symbol(_function))
     end
-
-    (f::Fun{R, A, H})(@specialize(args...)) where {R, A, H} = f._function(args...)
-
-
     
     Base.string(f::Fun) = string(typeof(f))
     Base.isequal(f::Fun, f2::Fun) = (typeof(f) == typeof(f2)) && f._function == f2._function
     Base.show(io::IO, f::Fun) = print(io, string(f))
     Base.print(io::IO, f::Fun) = print(io, string(f))
+    Docs.getdoc(f::Fun) = string(f)
 
-    Base.isequal(::Type{Fun{R, A, H}}, ::Type{Fun{R2, A2, H2}}) where {R, A, H, R2, A2, H2} = (R == R2 && A == A2 && H == H2)
-    Base.print(io::IO, f::Type{Fun}) = print(io, string(f))
-    Base.show(io::IO, f::Type{Fun}) = show(io, string(f))     
-    Base.string(::Type{Fun{R, A, H}}) where {R, A, H} = "Fun{$R, $A}" 
+    checkeq(::Type{Fun{R, A, H}}, ::Type{Fun{R2, A2, H2}}) where {R, A, H, R2, A2, H2} = (R == R2 && A == A2 && H == H2)
+    Base.isequal(t::Type{F1}, t2::Type{F2}) where {F1 <: Fun, F2 <: Fun} = checkeq(t, t2)
+    Base.print(io::IO, f::Type{F}) where F <: Fun = print(io, string(f))
+    Base.show(io::IO, f::Type{F}) where F <: Fun = show(io, string(f))   
+    Base.string(f::Type{Fun{R, A, H}}) where {R, A, H} = "Fun{$R, $A}"  
+    Docs.getdoc(f::Type{F}) where F <: Fun = string(f)
+    
 end
 
 function fun_str(alias, msg, generic_values)
@@ -51,53 +49,106 @@ function fun_str(alias, msg, generic_values)
     replace(msg, "~" => "")
 end
 
+fun_str(msg) = replace(msg, "~" => "")
+
 
 "Default Function TypeDef Generator"
-function FunDef(mod, line, expr, ret, args, msg)
-    result = nothing
+function FunDef(mod, line, fun, ret, args, msg)
+    partialTypeDef = nothing
     partialStringDef = nothing
+    partialCallDef = nothing
+
     try
         #Strip Return Label
         ret = (ret isa Expr && ret.head == :(::)) ? ret.args[2] : ret
-        args = args
-        aliasName = expr isa Expr ? expr.args[1] : expr
-        generics = expr isa Expr ? expr.args[2:end] : []
+        argtypes = nothing
+        argnames = nothing
+        args = Any[arg for arg in args]
+        aliasName = fun isa Expr ? fun.args[1] : fun
+        generics = fun isa Expr ? fun.args[2:end] : []
 
-        if args isa Expr
+        if args isa Expr || args isa Symbol
             #Strip Arg Labels
-            (args.head == :(::)) && (args = args.args[2])
-        else
-            #Strip Args Labels
-            if !(args isa Symbol)
-                Args = Any[arg for arg in args]
-                for i in 1:length(args)
-                    if Args[i] isa Expr && Args[i].head == :(::)
-                        Args[i] = Args[i].args[2]
-                    end
-                end 
-
-                #Create Arg Tuple
-                args = Expr(:curly, :Tuple, Args...)
+            if args isa Expr && args.head == :(::)
+                argtypes = [args.args[2]]
+                argnames = [args.args[1]]
+            else
+                #Add Argument Label
+                argnames = [:arg1]
+                argtypes = [args]
+                args = Expr(:(::), :arg1, args)
             end
+        else
+            argtypes = Any[arg for arg in args]
+            argnames = [Symbol("arg$i") for i in 1:length(args)]
+            for i in 1:length(args)
+                if argtypes[i] isa Expr && args[i].head == :(::)
+                    argnames[i] = argtypes[i].args[1]
+                    argtypes[i] = argtypes[i].args[2]
+                else
+                    args[i] = Expr(:(::), argnames[i], args[i])
+                end
+            end 
+            argtypes = Expr(:curly, :Tuple, argtypes...)
         end
 
-        #Create Alias (Use Hash/Rand for Equality Checking)
-        curlyBlock = Expr(:curly, GlobalRef(@__MODULE__, :Fun), ret, msg === nothing ? rand() : hash(msg), args)
-        result = Expr(:const, Expr(:(=), expr, curlyBlock))
 
-        aliasResult = Core.eval(mod, result)
+
+        #Create Alias (Use Hash/Rand for Equality Checking)
+        curlyBlock = Expr(:curly, GlobalRef(@__MODULE__, :Fun), ret, argtypes, msg === nothing ? rand() : hash(msg))
+        partialTypeDef = Expr(:const, Expr(:(=), fun, curlyBlock))
+
+        aliasResult = Core.eval(mod, partialTypeDef)
         
+
+
+        #Define most of the specialized function call expr
+        partialCallDef = :(@inline function (f::$fun)()::$ret where {}
+                                        f._function()
+                                   end)
+
+        partialCallDef.args[3].args[2].args[1] = LineNumberNode(line.line, line.file)
+        partialCallDef.args[3].args[2].args[2] = LineNumberNode(line.line, line.file)
+
+        #Append Function Generics
+        whereExpr = partialCallDef.args[3].args[1].args
+        append!(whereExpr, generics)    
+        
+        #Append the arguments to the function Call
+        funArgs = partialCallDef.args[3].args[1].args[1].args[1].args
+        append!(funArgs, args)
+
+        #Append the arguments to the inner function 
+        funBlock = partialCallDef.args[3].args[2].args[3].args
+        append!(funBlock, argnames)
+
+        Core.eval(mod, partialCallDef)
         msg === nothing && return aliasResult
 
-        partialStringDef = :(Base.string(x::Empty) where {} = fun_str($aliasName, $msg))
 
-        whereExpr = partialStringDef.args[1]
+
+
+        #Eval No Generic Message
+        if length(generics) > 0
+            #Define most of the function string expr
+            nogenstrexpr = :(Base.string(x::Type{$aliasName}) = fun_str($msg))
+           
+            #Replace with safer reference
+            fun_str_call = nogenstrexpr.args[2].args[2].args
+            fun_str_call[1] = GlobalRef(@__MODULE__, :fun_str)
+
+            Core.eval(mod, nogenstrexpr)
+        end
+
+
+
+
+        #Define most of the function string expr
+        partialStringDef = :(Base.string(x::Type{$fun}) where {} = fun_str($aliasName, $msg))
+
         #Append Function Generics
+        whereExpr = partialStringDef.args[1]
         append!(whereExpr.args, generics)
-
-        #Replace Empty with Alias
-        itemLine = whereExpr.args[1].args[2].args
-        itemLine[2] = expr
 
         fun_call = partialStringDef.args[2].args[2].args
         #Replace with safer reference
@@ -109,13 +160,13 @@ function FunDef(mod, line, expr, ret, args, msg)
         push!(fun_call, tupleExpr)
 
         #Set Line Information
-        partialStringDef.args[2].args[1] = LineNumberNode(line.line + 1, line.file)   
-
+        partialStringDef.args[2].args[1] = LineNumberNode(line.line, line.file) 
         Core.eval(mod, partialStringDef)
         return aliasResult
     catch e
-        println("Error in Function Generating $expr in $mod")
-        println(result)
+        println("Error in Function Generating $fun in $mod")
+        println(partialTypeDef)
+        println(partialCallDef)
         println(partialStringDef)
         throw(e)
     end
@@ -130,12 +181,6 @@ function deffhash(mod, expr, ret, args)
 
     (ret == :Nothing) && return str * ")"
     return string(str * ")::($ret~)")
-end
-
-"Document a Fun Gen"
-macro DocFun(funcType, str)
-    type = Expr(:(::), :x, funcType isa Expr ? funcType.args[1] : funcType)
-    Core.eval(__module__, :(Docs.getdoc($type) = $str))
 end
 
 "Default Message Function (Args & Return) Type Definition Generator"

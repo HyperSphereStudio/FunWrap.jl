@@ -27,8 +27,3 @@ test(MyFuncName((x1, x2) → Int(x1 * x2))
 ```
 
 This library will have the function string(MyFuncName{Int}) return “.MyFuncName{Int}(arg1::Int, arg2::int):(return_arg::Int)”
-
-TODO:
-1. Make calls using the function wrapper inlined
-2. Types are truly enforced
-3. Make docs show the function string
