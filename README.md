@@ -5,7 +5,7 @@ To Install:
 #To Use
 Pkg.add("FunWrap")
 
-using Function Wrapper
+using FunWrap
 ```
 
 Usage:
