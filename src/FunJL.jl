@@ -1,4 +1,4 @@
-module FunJL
+module FunctionWrapper
 
 include("Iterable.jl")
 
