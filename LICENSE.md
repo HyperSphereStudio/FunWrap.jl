@@ -1,4 +1,4 @@
-The Lazy.jl package is licensed under the MIT Expat License:
+The FunWrap.jl package is licensed under the MIT Expat License:
 
 Copyright (c) 2021: Johnathan Bizzano, Julia Computing & contributors.
 
